@@ -21,6 +21,7 @@ import {
   ParsedNamesDocMap,
 } from "./parser/src/utils.ts";
 import { JsDocObject, JsDocParse } from "./parser/src/js-doc-parser.ts";
+import { render } from "https://deno.land/x/mustache/mod.ts";
 
 /**
  * For testing this builder use this editor:
@@ -282,6 +283,38 @@ export class AlosaurOpenApiBuilder<T> {
 
   public static async parseDenoDoc(path?: string): Promise<any> {
     return await getDenoDoc(path);
+  }
+
+  public static async serve(app: App<T>, serverUrl: string) {
+    /** @todo Use the same function in alosaur/cli once it will be exported instead */
+    async function renderAndWrite(outputName: string, body: string, name: string) {
+      const fileContent = await render(body, {
+        ...TemplateHelpers,
+        name,
+      });
+
+      await Deno.writeFile(outputName, encoder.encode(fileContent));
+    }
+
+    try {
+      const content = await Deno.readFile(`${Deno.cwd()}/swagger-ui/index.html.template`);
+      const decoder = new TextDecoder();
+      const url = serverUrl;
+      // Write index.html with the server url
+      await renderAndWrite("./swagger-ui/index.html", decoder.decode(content), url);
+        
+      // Serve OpenApi files
+      app.useStatic({
+        root: `${Deno.cwd()}/swagger-ui`,
+        index: "index.html",
+        baseRoute: "/api/",
+      });
+      console.log(`OpenApi documentation available on ${serverUrl}/api/index.html`);
+    } catch (error) {
+      // swagger-ui folder doest not exists
+      /** @todo Download it from repo */
+      return;
+    }
   }
 }
 
